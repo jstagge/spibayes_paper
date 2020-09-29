@@ -1,0 +1,9 @@
+
+# Run first code
+R CMD BATCH 01_synth_precip.R  ./output/Rout/01_synth_precip.Rout
+mv ./.RData ./output/Rout/01_synth_precip.RData
+mv ./Rplots.pdf ./output/Rout/01_synth_precip.pdf
+
+
+
+
