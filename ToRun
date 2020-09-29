@@ -5,5 +5,13 @@ mv ./.RData ./output/Rout/01_synth_precip.RData
 mv ./Rplots.pdf ./output/Rout/01_synth_precip.pdf
 
 
+# Run 
+R CMD BATCH 02_synth_mle_stat.R  ./output/Rout/02_synth_mle_stat.Rout
+mv ./.RData ./output/Rout/02_synth_mle_stat.RData
+mv ./Rplots.pdf ./output/Rout/02_synth_mle_stat.pdf
 
+# Run 
+R CMD BATCH 03_synth_mle_nonstat.R  ./output/Rout/03_synth_mle_nonstat.Rout
+mv ./.RData ./output/Rout/03_synth_mle_nonstat.RData
+mv ./Rplots.pdf ./output/Rout/03_synth_mle_nonstat.pdf
 

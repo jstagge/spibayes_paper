@@ -16,8 +16,7 @@ require(tidyverse)
 require(here)
 
 ### For custom MLE functions
-#require(spibayes)
-require(rstan)
+require(spibayes)
 require(mgcv)
 
 ### To save in SVG
@@ -32,10 +31,6 @@ require(lubridate)
 select <- dplyr::select
 
 theme_set(theme_classic(8))
-
-
-### Uncomment to load the packages manually
-sapply(list.files(pattern="[.]R$", path="/media/data/Documents/work_folder/projects_research/code/spibayes/R", full.names=TRUE), source)
 
 
 ###########################################################################
@@ -64,7 +59,6 @@ load(file.path(output_path, "synth_precip/synth_df.RData"))
 
 ls()
 
-
 ###########################################################################
 ###  Create knots
 ###########################################################################
@@ -72,6 +66,48 @@ ls()
 n_knots_jdate <- 25
 
 knot_loc <- list(jdate = seq(1,365,length=n_knots_jdate))
+
+
+###########################################################################
+###  Copied from other
+###########################################################################
+fitting_df <- synth_stat_df %>%
+#	filter(precip > 0) %>%
+	filter(jdate <= 365) %>%
+	drop_na(precip)
+
+
+### Run the cyclic
+cyclic_init <- pre_proc(data = fitting_df, type = "cyclic", knot_loc = knot_loc)
+
+cyclic_init <- list(input = cyclic_init)
+
+demo_df <- expand.grid(jdate = seq(1,365,0.25))
+
+
+### This fills in the gaps  by feeding it a complete time series
+### You could also do the same thing for subsets (single year, single day over maany years)
+vals_predicted <- predict_vals(cyclic_init, newdata = demo_df)
+
+ggplot(vals_predicted, aes(x=jdate, y=year, fill = mean)) + geom_raster()
+
+
+
+
+
+cyclic_result <- model_fit(spi_input = cyclic_init, iter = 1000, engine = "optimize", output_dir = "./output/")
+
+
+
+
+cyclic_init$x_matrix)
+[1] "mean"  "disp"  "theta"
+
+
+
+
+
+
 
 ###########################################################################
 ###  Create a smooth basis spline for demonstration
