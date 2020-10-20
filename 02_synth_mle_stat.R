@@ -78,7 +78,7 @@ ls()
 
 ## Use fitdist (MLE)
 ### Fit each day with MLE
-mle_synth_stat <- mle_gamma_fit(jdate = synth_stat_df$jdate, values = synth_stat_df$precip, n = 3000)
+mle_synth_stat <- mle_gamma_fit(jdate = synth_stat_df$jdate, values = synth_stat_df$precip, n = 3000, method = "param", ci = 0.95)
 
 ###########################################################################
 ###  Plot the results
@@ -431,6 +431,9 @@ ks_summary
 ###########################################################################
 ###  Save results from as an RDS file for analysis
 ###########################################################################
+
+### Save results for next step
+save(mle_synth_stat, file = file.path(write_output_path, "mle_synth_stat.rda"))
 
 ### Save results for next step
 save(ci_comparison_summary, ks_summary, ks_summary_jdate, file = file.path(write_output_path, "mle_stat_summary.RData"))

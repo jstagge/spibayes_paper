@@ -1,0 +1,14 @@
+D, failed duplicate check
+G, failed gap check
+I, failed internal consistency check
+K, failed streak/frequent-value check
+L, failed check on length of multiday period
+M, failed mega-consistency check
+N, failed naught check
+O, failed climatological outlier check
+R, failed lagged range check
+S, failed spatial consistency check
+T, failed temporal consistency check
+W, temperature too warm for snow
+X, failed bounds check
+Z, flagged as a result of an official Datzilla investigation

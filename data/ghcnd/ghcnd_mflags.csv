@@ -1,0 +1,9 @@
+A, value in precipitation or snow is a multi-day total accumulated since last measurement (used on Daily Form pdf file)
+B, precipitation total formed from two 12-hour totals
+D, precipitation total formed from four six hour totals
+K, converted from knots
+L, temperature appears to be lagged with respect to reported hour of observation
+O, converted from oktas
+P, identified as missing presumed zero in DSI 3200 and 3206
+T, trace of precipitation snowfall or snow depth
+W, converted from 16-point WBAN code (for wind direction)

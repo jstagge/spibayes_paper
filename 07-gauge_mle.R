@@ -576,7 +576,7 @@ ggsave(file.path(write_figures_path, "stat_model_vs_mle_facet.svg"), p, width =6
 ###  Save model results
 ###########################################################################
 
-save(param_est, param_long, ci_ribbon, file = file.path(output_path, "cyclic_stat/cyclic_output_params.rda"))
+save(fit_2, b_full_rate, b_full_shape, file = "../output/mymodel.rda")
 
 
 
