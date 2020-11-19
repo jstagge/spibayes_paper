@@ -57,11 +57,11 @@ data_path <- file.path(here_path, "./data")
 output_path <- file.path(here_path, "./output")
 
 ### Set up output folders
-write_output_path <- file.path(output_path, "tensor_nonstat")
+write_output_path <- file.path(output_path, "cyclic_stat")
 dir.create(write_output_path, recursive=TRUE, showWarnings = FALSE)
 
 ### Set up figure folder
-write_figures_path <- file.path(output_path, "figures/tensor_nonstat")
+write_figures_path <- file.path(output_path, "figures/cyclic_stat")
 dir.create(write_figures_path, recursive=TRUE, showWarnings = FALSE)
 
 ###########################################################################
@@ -69,6 +69,7 @@ dir.create(write_figures_path, recursive=TRUE, showWarnings = FALSE)
 ###########################################################################
 load(file.path(output_path, "synth_precip/true_param.RData"))
 load(file.path(output_path, "synth_precip/synth_df.RData"))
+load(file.path(output_path, "mle_fit/mle_synth_stat.rda"))
 ls()
 
 ###########################################################################
@@ -76,42 +77,107 @@ ls()
 ###########################################################################
 ### Create knots
 n_knots_jdate <- 15
-n_knots_year <- 10
 
-knots_jdate <- seq(1,365,length=n_knots_jdate)
-knots_year <- seq(1920,2019,length=n_knots_year)
-
-knot_loc <- list(jdate = knots_jdate, year = knots_year)
+knot_loc <- list(jdate = seq(1,365,length=n_knots_jdate))
 
 ###########################################################################
-###  Create a tensor basis spline for demonstration
+###  Create a smooth basis spline for demonstration
 ###########################################################################
 
 ### Create a dataframe with days from 1 to 366 for later and for demonstration
-demo_df <- expand.grid(jdate = seq(1,365,1), year = seq(1900,2020,5))
+demo_df <- expand.grid(jdate = seq(1,365,0.25))
+
+### Create cyclic spline basis
+spline_orig <- mgcv::smoothCon(s(jdate, bs="cc", k = n_knots_jdate), data=demo_df, knots = knot_loc, null.space.penalty = TRUE)
+
+### Create cyclic spline basis with absorbed constraint
+spline_reparam <- mgcv::smoothCon(s(jdate, bs="cc", k = n_knots_jdate), data=demo_df, knots = knot_loc, absorb.cons=TRUE, null.space.penalty = TRUE)
+
+### Extract the matrices for basis and penalty term
+X_orig <- spline_orig[[1]]$X
+
+### Reparameterize the penalty matrix
+s_reparam <- spline_reparam[[1]]$S[[1]]
+
+### Reparameterize both using the QR decomposition following Wood 
+### Where Z is the Q matrix without the first column, used to reparameterize
+C <- rep(1, nrow(X_orig)) %*% X_orig
+qrc <- qr(t(C))
+Z <- qr.Q(qrc,complete=TRUE)[,(nrow(C)+1):ncol(C)]
+
+### Calculate reparameterized matrices for basis and penalty
+X_reparam <- X_orig%*%Z
+
+### Create an object to plot
+demo_plot <- data.frame(demo_df, X_orig)
+demo_plot <- demo_plot %>%
+	pivot_longer(-jdate, names_to = "id", values_to = "basis") %>%
+	mutate(id = as.numeric(sub('.', '', id)))
+
+### Basis plot for demonstration purposes
+p <- ggplot(demo_plot, aes(x=jdate, y=basis, colour = id, group = id)) %>%
+	+ geom_line() %>%
+	+ scale_x_continuous(name = "Julian Date", breaks=seq(1,365, 30), expand=c(0,0)) %>%
+	+ scale_y_continuous(name = "Basis Function") %>%
+	+ scale_colour_gradientn(colours = tableau_color_pal(palette = "Classic Cyclic")(13)) %>%
+	+ theme(legend.position = "none")%>%
+	+ coord_cartesian(xlim=c(1, 365))
+
+p
+
+### Save Figure
+ggsave(file.path(write_figures_path, "basis_fig.png"), p, width =5, height = 4.5, dpi = 300)
+ggsave(file.path(write_figures_path, "basis_fig.pdf"), p, width =5, height = 4.5)
+ggsave(file.path(write_figures_path, "basis_fig.svg"), p, width =5, height = 4.5)
+
+
+### Calculate the reparameterized basis
+reparam_plot <- data.frame(demo_df, X_reparam)
+reparam_plot <- reparam_plot %>%
+	pivot_longer(-jdate, names_to = "id", values_to = "basis") %>%
+	mutate(id = as.numeric(sub('.', '', id)))
+
+
+### Quick plot for demonstration purposes
+p <- ggplot(reparam_plot, aes(x=jdate, y=basis, colour = id, group = id)) %>%
+	+ geom_line() %>%
+	+ scale_x_continuous(name = "Julian Date", breaks=seq(1,365, 30), expand=c(0,0)) %>%
+	+ scale_y_continuous(name = "Basis Function") %>%
+	+ scale_colour_gradientn(colours = tableau_color_pal(palette = "Classic Cyclic")(13)) %>%
+	+ theme(legend.position = "none")%>%
+	+ coord_cartesian(xlim=c(1, 365))
+
+p
+
+### Save Figure
+ggsave(file.path(write_figures_path, "basis_fig_reparam.png"), p, width =5, height = 4.5, dpi = 300)
+ggsave(file.path(write_figures_path, "basis_fig_reparam.pdf"), p, width =5, height = 4.5)
+ggsave(file.path(write_figures_path, "basis_fig_reparam.svg"), p, width =5, height = 4.5)
 
 
 ###########################################################################
-###  Calculate basis for data and preprocess to find initial estimates 
+###  Calculate basis for data and preprocess to find initial value estimates from MLE
 ###########################################################################
-fitting_df <- synth_non_stat_df %>%
+### Cut to only 365 days
+fitting_df <- synth_stat_df %>%
 	filter(jdate <= 365) %>%
-	drop_na(precip)
+	drop_na(precip) %>%
+	select(date, jdate, year, precip, zero)
 
 ### Run initial basis function from spibayes
-tensor_init <- pre_proc(data = fitting_df, type = "tensor", knot_loc = knot_loc)
+cyclic_init <- pre_proc(data = fitting_df, type = "cyclic", knot_loc = knot_loc)
 
 ###########################################################################
 ###  Check initial estimates
 ###########################################################################
 ### Check initial values
-tensor_init$input$b_0_init
-tensor_init$input$b_init
-tensor_init$input$lambda_init
+cyclic_init$input$b_0_init
+cyclic_init$input$b_init
+cyclic_init$input$lambda_init
 
 ### Estimate parameter values from model using initial beta estimates
-newdata_df <- expand.grid(jdate = seq(1,365,1), year = 1990)
-init_est <- predict_vals(tensor_init, newdata = newdata_df)
+newdata_df <- expand.grid(jdate = seq(1,365,1))
+init_est <- predict_vals(cyclic_init, newdata = newdata_df)
 
 ### Quick plot of Initial Values
 month_breaks <- c(yday(seq(as.Date("1900-01-01"), as.Date("1900-12-31"), by = "1 month")), 365)
@@ -120,7 +186,7 @@ month_labels <- c(as.character(month(seq(as.Date("1900-01-01"), as.Date("1900-12
 plot_line <- init_est$estimate$gamma %>%
 	#select(jdate, mean) %>%
 	mutate(line = "Estimate") %>%
-	bind_rows( true_param_non_stat %>% mutate(line = "True")) %>%
+	bind_rows( true_param_stat %>% mutate(line = "True")) %>%
 	mutate(line = factor(line, levels = c("True", "Estimate")))
 
 plot_ribbon <- init_est$marginal$mean %>%
@@ -160,7 +226,7 @@ p
 plot_line <- init_est$estimate$theta %>%
 	#select(jdate, mean) %>%
 	mutate(line = "Estimate") %>%
-	bind_rows( true_param_non_stat %>% mutate(line = "True")) %>%
+	bind_rows( true_param_stat %>% mutate(line = "True")) %>%
 	mutate(line = factor(line, levels = c("True", "Estimate")))
 
 plot_ribbon <- init_est$marginal$theta %>%
@@ -179,66 +245,67 @@ p <- ggplot(plot_line, aes(x=jdate)) %>%
 ### Plot
 p
 
-### Not particularly interesting
-### Estimate parameter values from model using initial beta estimates
-newdata_df <- expand.grid(jdate = seq(1,365,1), year = seq(1920,2019,1))
-init_est <- predict_vals(tensor_init, newdata = newdata_df)
-
-plot_raster <- init_est$estimate$gamma %>%
-	mutate(line = "Estimate") %>%
-	bind_rows( true_param_non_stat %>% select(jdate, year, mean) %>% mutate(line = "True") %>% filter(jdate <=365)) %>%
-	mutate(line = factor(line, levels = c("True", "Estimate")))
-
-p <- ggplot(plot_line, aes(x=jdate, y=year)) %>%
-	 + geom_tile(aes(fill = mean)) %>%
-	+ scale_fill_viridis(name = "Mean") %>%
-	+ facet_grid(.~line) %>%
-	+ theme_bw(8) %>%
-	+ scale_x_continuous(name = "Julian Date", breaks=month_breaks, expand = c(0,0), sec.axis = sec_axis(~ . + 0, breaks = month_breaks, labels = month_labels)) %>% ### This seems to break it, putting white lines , expand = c(0, 0)
-	+ scale_y_continuous(name="Year", breaks = seq(1920,2020,20),  expand=c(0,0)) %>%
-	+ coord_cartesian(xlim=c(1,365), ylim = c(1920,2020))
-### Plot
-p
-
-
-#ggplot(init_est$marginal$mean, aes(x=jdate, y=mean_jdate)) + geom_line()
-#ggplot(init_est$marginal$mean, aes(x=jdate, y=mean_year)) + geom_line()
-#ggplot(init_est$marginal$mean, aes(x=jdate, y=year)) + geom_tile(aes(fill = mean_tensor))
-
-# Don't go to positive/negative infinity
-#ggplot(df, aes(x)) + stat_ecdf(geom = "step", pad = FALSE)
-
-
 ###########################################################################
 ###  Run the model to obtain a posterior mode (penalized maximum likelihood) estimate.
 ###  Without the full Bayesian
 ###########################################################################
 ### Run the model
-#print("Before Optimize")
+cyclic_result <- model_fit(spi_input = cyclic_init, iter = 2000, engine = "optimize", output_dir = "./output/cyclic_stat")
 
-#tensor_result <- model_fit(spi_input = tensor_init, iter = 2000, engine = "optimize", output_dir = write_output_path)
+### Estimate parameter values from model using initial beta estimates
+newdata_df <- expand.grid(jdate = seq(1,365,1))
+param_est <- predict_vals(cyclic_result, newdata = newdata_df)
 
-#save(tensor_result, file = file.path(write_output_path, "tensor_optimize.rda"))
+head(param_est$gamma)
+
+### Quick check, confirm that optimize is equivalent to MLE (init estimate)
+p <- ggplot(param_est$gamma, aes(x=jdate, y = mean)) %>%
+	+ geom_line(data = true_param_stat, aes(y=mean), colour = "red") %>%
+	+ geom_line(size=1) %>%
+	+ geom_line(data = init_est$gamma, aes(y=mean), colour = "white", linetype = "dashed") %>%
+	+ theme_classic()%>%
+	+ scale_x_continuous(name = "Julian Date", breaks=round(seq(1,365,length.out=20))) %>% ### This seems to break it, putting white lines , expand = c(0, 0)
+	+ scale_y_continuous(name="Mean") %>%
+	+ coord_cartesian(xlim=c(1,365))
+### Plot
+p
+
+### Check of exact fitted model
+param_est <- predict_vals(cyclic_result)
+
+head(param_est$gamma)
+
+### Raster plot
+ggplot(param_est$gamma, aes(x=jdate, y=year, fill=mean)) + geom_raster() + scale_fill_viridis()
+
+### Check everywhere
+newdata_df <- expand.grid(jdate = seq(1,365,1), year = seq(min(fitting_df$year, na.rm=TRUE), max(fitting_df$year, na.rm=TRUE), 1))
+
+param_est <- predict_vals(cyclic_result, newdata = newdata_df)
+
+ggplot(param_est$gamma, aes(x=jdate, y=year, fill=mean)) + geom_raster() + scale_fill_viridis()
+
 
 ###########################################################################
 ###  Fit the full Bayesian model
 ###########################################################################
 
 ### Run the model
-model_tensor <- model_fit(spi_input = tensor_init, n_chains = 1, cores = 1, iter = 2000, engine = "sample", output_dir = write_output_path)
+model_cyclic <- model_fit(spi_input = cyclic_init, n_chains = 1, cores = 1, iter = 2500, engine = "sample", output_dir = "./output/cyclic_stat")
 
-save(model_tensor, file = file.path(write_output_path, "model_tensor.rda"))
+
 ###########################################################################
 ###  Save results from as an RDS file for analysis
 ###########################################################################
 ### Read in the model run information
-model_read <- rstan::read_stan_csv(model_tensor$model_fit$output_files())
+model_read <- rstan::read_stan_csv(model_cyclic$model_fit$output_files())
 
 #model_read <- rstan::read_stan_csv("/media/data/Documents/work_folder/projects_research/code/spibayes_paper/output/cyclic_stat/cyclic_ti-202010061934-1-78c360.csv")
 
 #model_read <- rstan::read_stan_csv("/media/data/Documents/work_folder/projects_research/code/spibayes_paper/output/cyclic_stat/cyclic_ti-202010061701-1-2e4b83.csv")
 
 ### Save results for next step
+save(model_cyclic, file = file.path(write_output_path, "model_cyclic.rda"))
 save(model_read, file = file.path(write_output_path, "model_read.rda"))
 
 #load(file.path(write_output_path, "model_cyclic.rda"))
@@ -269,8 +336,6 @@ plot(model_read, plotfun = "trace", pars = "sigma_theta", inc_warmup = FALSE)
 
 ### Check the distributions of beta values
 plot(model_read, show_density = TRUE, ci_level = 0.5, pars = "b_mean_jdate", fill_color = "lightblue") + theme_classic()
-plot(model_read, show_density = TRUE, ci_level = 0.5, pars = "b_mean_year", fill_color = "lightblue") + theme_classic()
-
 plot(model_read, show_density = TRUE, ci_level = 0.5, pars = "b_disp_jdate", fill_color = "lightblue") + theme_classic()
 plot(model_read, show_density = TRUE, ci_level = 0.5, pars = "b_theta_jdate", fill_color = "lightblue") + theme_classic()
 
@@ -278,8 +343,8 @@ plot(model_read, show_density = TRUE, ci_level = 0.5, pars = "b_theta_jdate", fi
 ###  Convert parameters to long form and summarize
 ###########################################################################
 ### Estimate parameter values from model using initial beta estimates
-newdata_df <- expand.grid(jdate = seq(1,365,1), year = seq(1920, 2019, 1))
-param_est <- predict_vals(model_tensor, newdata = newdata_df)
+newdata_df <- expand.grid(jdate = seq(1,365,1))
+param_est <- predict_vals(model_cyclic, newdata = newdata_df)
 
 ### Convert to long format
 gamma_long <-  param_est$estimate$gamma %>%
@@ -366,7 +431,7 @@ ci_ribbon <- mean_ci %>%
 ###  Process true values for plotting
 ###########################################################################
 ### Process the true values
-true_param_long <- true_param_non_stat %>%
+true_param_long <- true_param_stat %>%
 	pivot_longer(
 		cols = c(-jdate),
 		names_to = "param",

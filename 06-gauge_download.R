@@ -28,7 +28,7 @@ require(ggrepel)
 require(rnaturalearth)
 require(sf)
 library(maps)
-### To access GHCND
+## To access GHCND
 require(rnoaa)
 
 select <- dplyr::select
@@ -92,7 +92,7 @@ stations_sf <- st_as_sf(stations_df, coords = c("longitude", "latitude"), crs = 
 ### Download countries and states
 states <- st_as_sf(map("state", plot = FALSE, fill = TRUE))
 world <- ne_countries(scale = "medium", returnclass = "sf")
-#head(states)
+head(states)
 
 p <- ggplot(data = world) %>%
 	+ geom_sf(fill = "grey80") %>%
@@ -100,8 +100,8 @@ p <- ggplot(data = world) %>%
 	+ geom_sf(fill = NA) %>%
 	+ geom_sf(data = stations_sf, size = 4, shape = 23, fill = "#bd0026") %>%
     + coord_sf( crs = 4326, xlim = c(-165, -60), ylim = c(15, 55), expand=FALSE) %>%
-#	+ geom_text_repel(data = stations_df, aes(x = longitude, y = latitude, label = short_name), fontface = "bold", nudge_x = c(1, -1.5, 2, 2, -1), nudge_y = c(0.25, -0.25, 0.5, 0.5, -0.5)) %>%
-	+ geom_text(data = stations_df, aes(x = longitude, y = latitude, label = short_name), fontface = "bold", nudge_x = -5, nudge_y = 1) %>%
+	+ geom_text_repel(data = stations_df, aes(x = longitude, y = latitude, label = short_name), fontface = "bold", nudge_x = c(1, -1.5, 2, 2, -1), nudge_y = c(0.25, -0.25, 0.5, 0.5, -0.5)) %>%
+#	+ geom_text(data = stations_df, aes(x = longitude, y = latitude, label = short_name), fontface = bold", nudge_x = -5, nudge_y = 1) %>%
 	+ theme_bw(8) %>%
 	+ scale_x_continuous(name = "Longitude", breaks = seq(-180,100, 10)) %>%
 	+ scale_y_continuous(name = "Latitude", breaks = seq(-180,100, 10))

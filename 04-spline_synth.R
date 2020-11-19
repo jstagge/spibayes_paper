@@ -165,6 +165,9 @@ fitting_df <- synth_stat_df %>%
 	select(date, jdate, year, precip, zero)
 
 ### Run initial basis function from spibayes
+head(fitting_df)
+knot_loc
+
 cyclic_init <- pre_proc(data = fitting_df, type = "cyclic", knot_loc = knot_loc)
 
 ###########################################################################
@@ -254,12 +257,12 @@ cyclic_result <- model_fit(spi_input = cyclic_init, iter = 2000, engine = "optim
 
 ### Estimate parameter values from model using initial beta estimates
 newdata_df <- expand.grid(jdate = seq(1,365,1))
+
 param_est <- predict_vals(cyclic_result, newdata = newdata_df)
 
-head(param_est$gamma)
 
 ### Quick check, confirm that optimize is equivalent to MLE (init estimate)
-p <- ggplot(param_est$gamma, aes(x=jdate, y = mean)) %>%
+p <- ggplot(param_est$estimate$gamma, aes(x=jdate, y = mean)) %>%
 	+ geom_line(data = true_param_stat, aes(y=mean), colour = "red") %>%
 	+ geom_line(size=1) %>%
 	+ geom_line(data = init_est$gamma, aes(y=mean), colour = "white", linetype = "dashed") %>%
@@ -273,17 +276,17 @@ p
 ### Check of exact fitted model
 param_est <- predict_vals(cyclic_result)
 
-head(param_est$gamma)
+head(param_est$estimate$gamma)
 
 ### Raster plot
-ggplot(param_est$gamma, aes(x=jdate, y=year, fill=mean)) + geom_raster() + scale_fill_viridis()
+ggplot(param_est$estimate$gamma, aes(x=jdate, y=year, fill=mean)) + geom_raster() + scale_fill_viridis()
 
 ### Check everywhere
 newdata_df <- expand.grid(jdate = seq(1,365,1), year = seq(min(fitting_df$year, na.rm=TRUE), max(fitting_df$year, na.rm=TRUE), 1))
 
 param_est <- predict_vals(cyclic_result, newdata = newdata_df)
 
-ggplot(param_est$gamma, aes(x=jdate, y=year, fill=mean)) + geom_raster() + scale_fill_viridis()
+ggplot(param_est$estimate$gamma, aes(x=jdate, y=year, fill=mean)) + geom_raster() + scale_fill_viridis()
 
 
 ###########################################################################
